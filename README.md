@@ -1,36 +1,28 @@
 ShareYourCode (SYC)
 
-Simple real-time-ish code sharing app built with PHP, HTML, CSS, and JS. No Node required. Uses polling via AJAX to sync code and chat across participants in a room.
+Static HTML/CSS/JS version (GitHub Pages friendly). Room state and chat are stored in the browser's localStorage.
 
 Features
 - Create or join a room via shareable URL
-- Collaborative code editor (CodeMirror via CDN)
-- Live code sync with lightweight conflict handling (revision-based)
-- Per-room chat
+- Code editor (CodeMirror via CDN)
+- Per-room chat (stored locally)
 - Language mode and theme selection (stored client-side)
 
-Requirements
-- PHP 8.0+ with file write permissions to the `data/` directory
-- A web server (Apache/Nginx) or PHP built-in server
+Limitations
+- No server backend: no real multi-user sync across different devices/browsers
+- Data is per-browser (localStorage). Different users will not see each other's changes
 
 Getting Started
-1) Ensure the `data/` directory is writable by the web server.
-2) Start a PHP server from the project root:
-   php -S localhost:8000
-3) Open in your browser:
-   http://localhost:8000/
+1) Open `index.html` directly (or serve the folder with any static server)
+2) Create or join a room; edits and chat are saved in localStorage per room
 
 Project Structure
-- index.php           Landing page (create/join room)
-- room.php            Room page with editor and chat
-- api/room_state.php  GET: fetch code; POST: update code
-- api/chat.php        GET: fetch chat; POST: add chat message
-- assets/app.js       Frontend logic (polling / UI wiring)
+- index.html          Landing page (create/join room)
+- room.html           Room page with editor and chat
+- assets/app.js       Frontend logic (localStorage-based)
 - assets/styles.css   Basic styling
-- data/               Storage directory for rooms and chat JSON files
 
 Notes
-- This demo uses file-based JSON storage for simplicity. For production, replace with a database or in-memory store.
-- Polling interval defaults to 1000ms; you can adjust in `assets/app.js`.
+- Polling interval defaults to 1000ms; used for cross-tab refresh within same browser
 
 

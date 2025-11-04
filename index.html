@@ -10,7 +10,7 @@
     <div class="container">
         <header class="header">
             <h1>ShareYourCode</h1>
-            <p class="tagline">Collaborez sur du code en temps réel (via polling) — simple et rapide.</p>
+            <p class="tagline">Version statique (HTML/CSS/JS) — stockage local du navigateur.</p>
         </header>
 
         <main class="card">
@@ -31,16 +31,11 @@
         </main>
 
         <footer class="footer">
-            <span>SYC — HTML/CSS/JS avec backend PHP externe</span>
+            <span>SYC — 100% statique; pas de synchronisation entre différents appareils.</span>
         </footer>
     </div>
 
     <script>
-    // Configure this to point to your PHP backend base URL
-    // Example: window.SYC_API_BASE = 'https://votre-domaine-php.tld';
-    // If not set, it falls back to '' and will fail on GitHub Pages.
-    window.SYC_API_BASE = window.SYC_API_BASE || '';
-
     function randomId(len) {
         const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let out = '';
@@ -48,35 +43,35 @@
         return out;
     }
 
-    document.getElementById('create-room-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        try {
-            const res = await fetch((window.SYC_API_BASE || '') + '/api/room_state.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create', roomId: randomId(8) })
-            });
-            const data = await res.json();
-            if (data.ok && data.roomId) {
-                const url = new URL('room.html', window.location.origin + window.location.pathname);
-                url.searchParams.set('room', data.roomId);
-                window.location.href = url.toString();
-            } else {
-                alert('Erreur lors de la création: ' + (data.error || 'inconnue'));
-            }
-        } catch (err) {
-            alert('Erreur réseau: ' + err);
+    function initRoomInLocalStorage(roomId) {
+        const k = `syc:room:${roomId}`;
+        if (!localStorage.getItem(k)) {
+            const initial = { roomId, revision: 1, code: `// Bienvenue sur SYC (${roomId})\n`, filename: 'snippet.js', language: 'javascript', updatedAt: Date.now() };
+            localStorage.setItem(k, JSON.stringify(initial));
         }
+        const chatK = `syc:chat:${roomId}`;
+        if (!localStorage.getItem(chatK)) {
+            localStorage.setItem(chatK, JSON.stringify({ roomId, messages: [] }));
+        }
+    }
+
+    document.getElementById('create-room-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const roomId = randomId(8);
+        initRoomInLocalStorage(roomId);
+        const url = new URL('room.html', window.location.href);
+        url.searchParams.set('room', roomId);
+        window.location.href = url.toString();
     });
 
     document.getElementById('join-room-form').addEventListener('submit', (e) => {
         e.preventDefault();
         const roomId = document.getElementById('room-id-input').value.trim();
-        if (!roomId) return false;
-        const url = new URL('room.html', window.location.origin + window.location.pathname);
+        if (!roomId) return;
+        initRoomInLocalStorage(roomId);
+        const url = new URL('room.html', window.location.href);
         url.searchParams.set('room', roomId);
         window.location.href = url.toString();
-        return false;
     });
     </script>
 </body>

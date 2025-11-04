@@ -1,18 +1,10 @@
-<?php
-$roomId = isset($_GET['room']) ? preg_replace('/[^a-zA-Z0-9_-]/', '', $_GET['room']) : '';
-if ($roomId === '') {
-    header('Location: index.php');
-    exit;
-}
-?>
 <!DOCTYPE html>
-<html lang="fr"> 
+<html lang="fr">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SYC — Salle <?php echo htmlspecialchars($roomId); ?></title>
+    <title>SYC — Salle</title>
     <link rel="stylesheet" href="assets/styles.css">
-    <!-- CodeMirror CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
     <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.js"></script>
@@ -26,8 +18,8 @@ if ($roomId === '') {
     <div class="container room">
         <header class="room-header">
             <div class="left">
-                <a class="logo" href="index.php">SYC</a>
-                <span class="room-id">Salle: <strong id="room-id-label"><?php echo htmlspecialchars($roomId); ?></strong></span>
+                <a class="logo" href="index.html">SYC</a>
+                <span class="room-id">Salle: <strong id="room-id-label"></strong></span>
                 <button id="copy-link" class="btn small">Copier le lien</button>
                 <button id="copy-readonly-link" class="btn small">Lien lecture seule</button>
             </div>
@@ -63,8 +55,12 @@ if ($roomId === '') {
     </div>
 
     <script>
-    window.SYC_ROOM_ID = <?php echo json_encode($roomId); ?>;
-    window.SYC_READONLY = <?php echo isset($_GET['readonly']) && $_GET['readonly'] === '1' ? 'true' : 'false'; ?>;
+    const params = new URLSearchParams(window.location.search);
+    const roomId = (params.get('room') || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!roomId) { window.location.href = 'index.html'; }
+    document.getElementById('room-id-label').textContent = roomId;
+    window.SYC_ROOM_ID = roomId;
+    window.SYC_READONLY = params.get('readonly') === '1';
     </script>
     <script src="assets/app.js"></script>
 </body>

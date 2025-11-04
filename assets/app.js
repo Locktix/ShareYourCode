@@ -84,17 +84,37 @@
     });
   }
 
-  // Networking
-  async function fetchRoom() {
-    const res = await fetch(`api/room_state.php?roomId=${encodeURIComponent(roomId)}&action=get`);
-    const data = await res.json();
-    if (!data.ok) return;
-    const { room } = data;
+  // Local storage helpers
+  const ROOM_KEY = `syc:room:${roomId}`;
+  const CHAT_KEY = `syc:chat:${roomId}`;
+
+  function readRoom() {
+    const raw = localStorage.getItem(ROOM_KEY);
+    try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  function writeRoom(room) {
+    localStorage.setItem(ROOM_KEY, JSON.stringify(room));
+  }
+  function readChat() {
+    const raw = localStorage.getItem(CHAT_KEY);
+    try { return raw ? JSON.parse(raw) : { roomId, messages: [] }; } catch { return { roomId, messages: [] }; }
+  }
+  function writeChat(chat) {
+    localStorage.setItem(CHAT_KEY, JSON.stringify(chat));
+  }
+
+  function fetchRoom() {
+    const room = readRoom();
     if (!room) return;
     if (room.revision !== currentRevision) {
       isApplyingRemote = true;
       codeMirror.setValue(room.code || '');
       currentRevision = room.revision;
+      if (room.filename) filenameInput.value = room.filename;
+      if (room.language) {
+        languageSel.value = room.language;
+        codeMirror.setOption('mode', room.language);
+      }
       isApplyingRemote = false;
     }
   }
@@ -102,36 +122,32 @@
   async function sendUpdate() {
     if (isReadOnly) return;
     if (isApplyingRemote) return; // don't echo remote updates back
-    try {
-      const payload = { action: 'update', roomId, code: codeMirror.getValue(), baseRevision: currentRevision, filename: filenameInput.value.trim() || 'snippet', language: languageSel.value };
-      const res = await fetch('api/room_state.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.ok) {
-        currentRevision = data.room.revision;
-      } else if (data.conflict && data.room) {
-        // Rebase by taking latest; naive strategy
-        isApplyingRemote = true;
-        codeMirror.setValue(data.room.code || '');
-        currentRevision = data.room.revision;
-        isApplyingRemote = false;
-      }
-    } catch (e) {
-      // ignore transient
-    }
+    const current = readRoom() || { roomId, revision: 1, code: '', filename: 'snippet.js', language: 'javascript', updatedAt: Date.now() };
+    const updated = {
+      roomId,
+      revision: (current.revision || 1) + 1,
+      code: codeMirror.getValue(),
+      filename: filenameInput.value.trim() || (current.filename || 'snippet.js'),
+      language: languageSel.value || (current.language || 'javascript'),
+      updatedAt: Date.now()
+    };
+    writeRoom(updated);
+    currentRevision = updated.revision;
   }
 
   async function sendUpdateMeta() {
     if (isReadOnly) return;
-    try {
-      const payload = { action: 'update', roomId, code: codeMirror.getValue(), baseRevision: currentRevision, filename: filenameInput.value.trim() || 'snippet', language: languageSel.value };
-      const res = await fetch('api/room_state.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (data.ok) currentRevision = data.room.revision;
-    } catch {}
+    const current = readRoom() || { roomId, revision: 1, code: codeMirror.getValue(), filename: 'snippet.js', language: 'javascript', updatedAt: Date.now() };
+    const updated = {
+      roomId,
+      revision: (current.revision || 1) + 1,
+      code: current.code,
+      filename: filenameInput.value.trim() || (current.filename || 'snippet.js'),
+      language: languageSel.value || (current.language || 'javascript'),
+      updatedAt: Date.now()
+    };
+    writeRoom(updated);
+    currentRevision = updated.revision;
   }
 
   // Chat
@@ -149,13 +165,9 @@
     chatLog.scrollTop = chatLog.scrollHeight;
   }
 
-  async function fetchChat() {
-    if (isReadOnly) { // still fetch to view chat, but disable input below
-      // continue
-    }
-    const res = await fetch(`api/chat.php?roomId=${encodeURIComponent(roomId)}&action=get`);
-    const data = await res.json();
-    if (data.ok) renderChat(data.chat);
+  function fetchChat() {
+    const chat = readChat();
+    renderChat(chat);
   }
 
   if (isReadOnly) {
@@ -168,18 +180,11 @@
     const name = chatName.value.trim() || 'Anonyme';
     const text = chatText.value.trim();
     if (!text) return;
-    try {
-      const res = await fetch('api/chat.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, name, text })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        renderChat(data.chat);
-        chatText.value = '';
-      }
-    } catch (e) { /* ignore */ }
+    const chat = readChat();
+    chat.messages = (chat.messages || []).concat([{ name, text, ts: Math.round(Date.now() / 1000) }]).slice(-200);
+    writeChat(chat);
+    renderChat(chat);
+    chatText.value = '';
   });
 
   // Polling loops
@@ -197,30 +202,41 @@
 
   // Boot
   initEditor();
-  // initial fetch also sets initial revision
-  fetch(`api/room_state.php?roomId=${encodeURIComponent(roomId)}&action=get`).then(r => r.json()).then(d => {
-    if (d.ok && d.room) {
-      isApplyingRemote = true;
-      codeMirror.setValue(d.room.code || '');
-      currentRevision = d.room.revision || 1;
-      if (d.room.filename) {
-        filenameInput.value = d.room.filename;
-        localStorage.setItem('syc.filename', d.room.filename);
-        const detected = detectModeFromFilename(d.room.filename);
-        if (detected) {
-          languageSel.value = detected;
-          localStorage.setItem('syc.lang', detected);
-          codeMirror.setOption('mode', detected);
-        }
+  // Initialize local room if missing
+  if (!readRoom()) {
+    writeRoom({ roomId, revision: 1, code: '', filename: 'snippet.js', language: 'javascript', updatedAt: Date.now() });
+  }
+  // Load initial state
+  const initial = readRoom();
+  if (initial) {
+    isApplyingRemote = true;
+    codeMirror.setValue(initial.code || '');
+    currentRevision = initial.revision || 1;
+    if (initial.filename) {
+      filenameInput.value = initial.filename;
+      localStorage.setItem('syc.filename', initial.filename);
+      const detected = detectModeFromFilename(initial.filename);
+      if (detected) {
+        languageSel.value = detected;
+        localStorage.setItem('syc.lang', detected);
+        codeMirror.setOption('mode', detected);
       }
-      if (d.room.language) {
-        languageSel.value = d.room.language;
-        localStorage.setItem('syc.lang', d.room.language);
-        codeMirror.setOption('mode', d.room.language);
-      }
-      isApplyingRemote = false;
     }
-    startPolling();
+    if (initial.language) {
+      languageSel.value = initial.language;
+      localStorage.setItem('syc.lang', initial.language);
+      codeMirror.setOption('mode', initial.language);
+    }
+    isApplyingRemote = false;
+  }
+  // Load initial chat
+  if (!localStorage.getItem(CHAT_KEY)) writeChat({ roomId, messages: [] });
+  fetchChat();
+  // Start polling and subscribe to storage events (cross-tab updates)
+  startPolling();
+  window.addEventListener('storage', (e) => {
+    if (e.key === ROOM_KEY) fetchRoom();
+    if (e.key === CHAT_KEY) fetchChat();
   });
 
   // Download
