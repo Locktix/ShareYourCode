@@ -1,4 +1,5 @@
 (() => {
+  function start() {
   const isRoom = typeof window.SYC_ROOM_ID !== 'undefined';
   if (!isRoom) return;
 
@@ -6,6 +7,7 @@
   const isReadOnly = !!window.SYC_READONLY;
   const POLL_MS = 1000;
   const editorEl = document.getElementById('editor');
+  if (!editorEl) { console.warn('SYC: editor element not found'); return; }
   const languageSel = document.getElementById('language');
   const themeSel = document.getElementById('theme');
   const filenameInput = document.getElementById('filename');
@@ -29,6 +31,7 @@
     themeSel.value = savedTheme;
     filenameInput.value = savedFilename;
 
+    if (typeof CodeMirror === 'undefined') { console.error('SYC: CodeMirror not loaded'); return; }
     codeMirror = CodeMirror.fromTextArea(editorEl, {
       lineNumbers: true,
       mode: savedLang,
@@ -265,6 +268,12 @@
     if (lower.endsWith('.json')) return 'javascript';
     if (lower.endsWith('.xml')) return 'xml';
     return null;
+  }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();
 
