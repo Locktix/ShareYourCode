@@ -1,0 +1,79 @@
+<?php
+// ShareYourCode (SYC) - Landing page
+?>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ShareYourCode (SYC)</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>ShareYourCode</h1>
+            <p class="tagline">Collaborez sur du code en temps réel (via polling) — simple et rapide.</p>
+        </header>
+
+        <main class="card">
+            <section>
+                <h2>Créer une salle</h2>
+                <form id="create-room-form" class="row">
+                    <button type="submit" class="btn primary">Créer une nouvelle salle</button>
+                </form>
+            </section>
+
+            <section>
+                <h2>Rejoindre une salle</h2>
+                <form id="join-room-form" class="row" onsubmit="return joinRoom(event)">
+                    <input type="text" id="room-id-input" class="input" placeholder="ID de salle" required>
+                    <button type="submit" class="btn">Rejoindre</button>
+                </form>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <span>SYC — HTML/CSS/JS/PHP</span>
+        </footer>
+    </div>
+
+    <script>
+    function randomId(len) {
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let out = '';
+        for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+        return out;
+    }
+
+    document.getElementById('create-room-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        try {
+            const res = await fetch('api/room_state.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', roomId: randomId(8) })
+            });
+            const data = await res.json();
+            if (data.ok && data.roomId) {
+                window.location.href = 'room.php?room=' + encodeURIComponent(data.roomId);
+            } else {
+                alert('Erreur lors de la création: ' + (data.error || 'inconnue'));
+            }
+        } catch (err) {
+            alert('Erreur réseau: ' + err);
+        }
+    });
+
+    function joinRoom(e) {
+        e.preventDefault();
+        const roomId = document.getElementById('room-id-input').value.trim();
+        if (!roomId) return false;
+        window.location.href = 'room.php?room=' + encodeURIComponent(roomId);
+        return false;
+    }
+    </script>
+</body>
+</html>
+
+
